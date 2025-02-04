@@ -1,0 +1,399 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>24 Puzzle Game</title>
+  <style>
+    body {
+      font-family: sans-serif; /* Apply sans font globally */
+    }
+    .puzzle-container {
+      max-width: 600px;
+      margin: 0 auto;
+      text-align: center;
+    }
+    .puzzle-cell {
+      background: #f56042; /* Numbered cell background color */
+      color: white;
+      width: 50px;
+      height: 50px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: 4px;
+      font-weight: bold;
+      touch-action: manipulation;
+      cursor: pointer;
+    }
+    .puzzle-cell.empty {
+      background: white; /* Empty cell background color */
+      cursor: default;
+    }
+    .controls button {
+      padding: 10px 20px;
+      background: #0073aa;
+      color: white;
+      border: none;
+      cursor: pointer;
+      margin: 5px;
+      font-family: sans-serif; /* Apply sans font to buttons */
+    }
+    .controls button#auto-sort-btn {
+      background: #28a745;
+    }
+    .controls button#reset-btn {
+      background: #dc3545;
+    }
+    #game-grid {
+      display: grid;
+      grid-template-columns: repeat(5, 50px);
+      gap: 5px;
+      margin: 20px auto;
+      justify-content: center;
+    }
+    #game-timer {
+      font-family: sans-serif; /* Apply sans font to timer */
+    }
+    h2 {
+      font-family: sans-serif; /* Apply sans font to heading */
+    }
+  </style>
+</head>
+<body>
+  <div class="puzzle-container">
+    <h2 style="color: #333;">24 Puzzle Game</h2>
+    <div id="game-grid"></div>
+    <div class="controls">
+      <button id="start-btn">Start Game</button>
+      <button id="auto-sort-btn">Auto Sort</button>
+      <button id="reset-btn" style="display: none;">Reset Game (R)</button>
+    </div>
+    <div style="text-align: center; margin-top: 15px;">
+      Time: <span id="game-timer">00:00</span>
+    </div>
+  </div>
+
+  <script>
+    document.addEventListener('DOMContentLoaded', function () {
+      let grid = [],
+        emptyRow = 4,
+        emptyCol = 4,
+        timerInterval,
+        startTime,
+        isAutoSorting = false;
+      let initialGrid = [];
+      let initialEmptyRow, initialEmptyCol;
+      let shuffleMoves = [];
+
+      function initGame() {
+        grid = [];
+        let num = 1;
+        for (let i = 0; i < 5; i++) {
+          let row = [];
+          for (let j = 0; j < 5; j++) {
+            row.push((i === 4 && j === 4) ? 0 : num++);
+          }
+          grid.push(row);
+        }
+        emptyRow = 4;
+        emptyCol = 4;
+        shuffleGrid();
+        initialGrid = JSON.parse(JSON.stringify(grid));
+        initialEmptyRow = emptyRow;
+        initialEmptyCol = emptyCol;
+        renderGrid(true);
+      }
+
+      function shuffleGrid() {
+        shuffleMoves = [];
+        const directions = ['w', 's', 'a', 'd'];
+        let validMoves = 0;
+        while (validMoves < 100) {
+          const dir = directions[Math.floor(Math.random() * directions.length)];
+          if (move(dir, true)) {
+            shuffleMoves.push(dir);
+            validMoves++;
+          }
+        }
+      }
+
+      function move(dir, isShuffling = false) {
+        let newRow = emptyRow;
+        let newCol = emptyCol;
+        if (dir === 'w' && emptyRow < 4) newRow++;
+        else if (dir === 's' && emptyRow > 0) newRow--;
+        else if (dir === 'a' && emptyCol < 4) newCol++;
+        else if (dir === 'd' && emptyCol > 0) newCol--;
+
+        if (newRow !== emptyRow || newCol !== emptyCol) {
+          grid[emptyRow][emptyCol] = grid[newRow][newCol];
+          grid[newRow][newCol] = 0;
+          emptyRow = newRow;
+          emptyCol = newCol;
+          renderGrid();
+          
+          if (!isShuffling && checkWin() && !isAutoSorting) {
+            clearInterval(timerInterval);
+            alert(`Congratulations! You solved the puzzle in ${document.getElementById('game-timer').textContent}!`);
+          }
+          return true;
+        }
+        return false;
+      }
+
+      function renderGrid(hideNumbers = false) {
+        const gridElement = document.getElementById('game-grid');
+        gridElement.innerHTML = '';
+        for (let i = 0; i < 5; i++) {
+          for (let j = 0; j < 5; j++) {
+            const cell = document.createElement('div');
+            cell.className = `puzzle-cell ${grid[i][j] === 0 ? 'empty' : ''}`;
+            cell.textContent = (hideNumbers && grid[i][j] !== 0) ? '' : grid[i][j];
+            
+            if (grid[i][j] !== 0) {
+              cell.dataset.row = i;
+              cell.dataset.col = j;
+              cell.addEventListener('click', handleTap);
+              cell.addEventListener('touchstart', handleTap);
+            }
+            
+            gridElement.appendChild(cell);
+          }
+        }
+      }
+
+      function handleTap(e) {
+        e.preventDefault();
+        if (isAutoSorting) return;
+        
+        const row = parseInt(e.target.dataset.row);
+        const col = parseInt(e.target.dataset.col);
+        
+        const isAdjacent = (
+          (Math.abs(row - emptyRow) === 1 && col === emptyCol) ||
+          (Math.abs(col - emptyCol) === 1 && row === emptyRow)
+        );
+
+        if (isAdjacent) {
+          let direction = '';
+          if (row === emptyRow - 1) direction = 's';
+          else if (row === emptyRow + 1) direction = 'w';
+          else if (col === emptyCol - 1) direction = 'd';
+          else if (col === emptyCol + 1) direction = 'a';
+          
+          if (direction) move(direction);
+        }
+      }
+
+      function checkWin() {
+        let num = 1;
+        for (let i = 0; i < 5; i++) {
+          for (let j = 0; j < 5; j++) {
+            if (i === 4 && j === 4) {
+              if (grid[i][j] !== 0) return false;
+            } else {
+              if (grid[i][j] !== num++) return false;
+            }
+          }
+        }
+        return true;
+      }
+
+      function updateTimer() {
+        const elapsed = Math.floor((Date.now() - startTime) / 1000);
+        const mins = Math.floor(elapsed / 60);
+        const secs = elapsed % 60;
+        document.getElementById('game-timer').textContent = 
+          `${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
+      }
+
+      function autoSort() {
+        if (isAutoSorting) return;
+        isAutoSorting = true;
+        const startTime = Date.now();
+        document.getElementById('auto-sort-btn').disabled = true;
+        document.getElementById('reset-btn').style.display = 'none';
+      
+        // Helper function to move empty space to target position
+        const moveEmptyTo = (targetRow, targetCol, delay = 0) => {
+          return new Promise(resolve => {
+            setTimeout(() => {
+              let moves = [];
+              let currentRow = emptyRow;
+              let currentCol = emptyCol;
+      
+              // Calculate vertical moves first
+              while (currentRow !== targetRow) {
+                if (currentRow < targetRow) {
+                  moves.push('s');
+                  currentRow++;
+                } else {
+                  moves.push('w');
+                  currentRow--;
+                }
+              }
+      
+              // Then horizontal moves
+              while (currentCol !== targetCol) {
+                if (currentCol < targetCol) {
+                  moves.push('d');
+                  currentCol++;
+                } else {
+                  moves.push('a');
+                  currentCol--;
+                }
+              }
+      
+              // Execute moves
+              let step = 0;
+              const moveInterval = setInterval(() => {
+                if (step >= moves.length) {
+                  clearInterval(moveInterval);
+                  resolve();
+                } else {
+                  move(moves[step]);
+                  step++;
+                }
+              }, 50);
+            }, delay);
+          });
+        };
+      
+        // Move a specific number to its target position
+        const moveNumberToPosition = async (number, targetRow, targetCol) => {
+          // Find current position of the number
+          let currentRow, currentCol;
+          grid.forEach((row, i) => {
+            row.forEach((num, j) => {
+              if (num === number) {
+                currentRow = i;
+                currentCol = j;
+              }
+            });
+          });
+      
+          // If already in position, return
+          if (currentRow === targetRow && currentCol === targetCol) return;
+      
+          // Move the number to target column
+          while (currentCol !== targetCol) {
+            const direction = currentCol < targetCol ? 'right' : 'left';
+            
+            // Move empty space to correct position to facilitate move
+            if (direction === 'right') {
+              await moveEmptyTo(currentRow, currentCol + 1);
+              move('a');
+            } else {
+              await moveEmptyTo(currentRow, currentCol - 1);
+              move('d');
+            }
+            
+            currentCol = direction === 'right' ? currentCol + 1 : currentCol - 1;
+          }
+      
+          // Move the number to target row
+          while (currentRow !== targetRow) {
+            const direction = currentRow < targetRow ? 'down' : 'up';
+            
+            // Move empty space to correct position to facilitate move
+            if (direction === 'down') {
+              await moveEmptyTo(currentRow + 1, currentCol);
+              move('w');
+            } else {
+              await moveEmptyTo(currentRow - 1, currentCol);
+              move('s');
+            }
+            
+            currentRow = direction === 'down' ? currentRow + 1 : currentRow - 1;
+          }
+        };
+      
+        // Main solving sequence
+        const solve = async () => {
+          // Solve row by row
+          for (let row = 0; row < 4; row++) {
+            // Solve first 4 columns in the row
+            for (let col = 0; col < 4; col++) {
+              const targetNumber = row * 5 + col + 1;
+              await moveNumberToPosition(targetNumber, row, col);
+            }
+      
+            // Handle last column in row
+            const lastInRow = (row + 1) * 5;
+            await moveNumberToPosition(lastInRow, row, 4);
+            
+            // Position empty space for next row
+            await moveEmptyTo(row + 1, 4);
+          }
+      
+          // Solve final row (except last 2x2 section)
+          for (let col = 0; col < 3; col++) {
+            const targetNumber = 4 * 5 + col + 1;
+            await moveNumberToPosition(targetNumber, 4, col);
+          }
+      
+          // Solve final 2x2 section
+          const finalMoves = ['s', 'd', 'w', 'a', 's', 'd', 'w', 'a'];
+          for (const moveDir of finalMoves) {
+            await new Promise(resolve => {
+              setTimeout(() => {
+                move(moveDir);
+                resolve();
+              }, 100);
+            });
+          }
+      
+          // Final verification
+          if (checkWin()) {
+            console.log(`Solved in ${Date.now() - startTime}ms`);
+          }
+          
+          isAutoSorting = false;
+          document.getElementById('auto-sort-btn').disabled = false;
+          document.getElementById('reset-btn').style.display = 'inline-block';
+        };
+      
+        solve();
+      }
+      function resetGame() {
+        clearInterval(timerInterval);
+        initGame();
+        document.getElementById('game-timer').textContent = '00:00';
+        document.getElementById('start-btn').style.display = 'inline-block';
+        document.getElementById('auto-sort-btn').style.display = 'inline-block';
+        document.getElementById('reset-btn').style.display = 'none';
+      }
+
+      function startGame() {
+        startTime = Date.now();
+        timerInterval = setInterval(updateTimer, 1000);
+        document.getElementById('start-btn').style.display = 'none';
+        document.getElementById('auto-sort-btn').style.display = 'none';
+        document.getElementById('reset-btn').style.display = 'inline-block';
+        renderGrid();
+      }
+
+      // Event listeners
+      document.getElementById('start-btn').addEventListener('click', startGame);
+      document.getElementById('auto-sort-btn').addEventListener('click', () => {
+        startGame();
+        autoSort();
+      });
+      document.getElementById('reset-btn').addEventListener('click', resetGame);
+
+      document.addEventListener('keydown', (e) => {
+        const key = e.key.toLowerCase();
+        if (['w', 'a', 's', 'd'].includes(key)) {
+          move(key);
+        } else if (key === 'r') {
+          resetGame();
+        }
+      });
+
+      initGame();
+    });
+  </script>
+</body>
+</html>
